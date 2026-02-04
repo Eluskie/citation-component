@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   DecoratorNode,
   DOMConversionMap,
@@ -18,13 +18,24 @@ export const CITATION_NODE_VERSION = Date.now();
 // Citation chip component with tooltip
 function CitationChip({ citationId }: { citationId: number }) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipY, setTooltipY] = useState(0);
+  const chipRef = useRef<HTMLSpanElement>(null);
   const { getCitation } = useCitationData();
   const citation = getCitation(citationId);
 
+  const handleMouseEnter = () => {
+    if (chipRef.current) {
+      const rect = chipRef.current.getBoundingClientRect();
+      setTooltipY(rect.top + rect.height / 2);
+    }
+    setShowTooltip(true);
+  };
+
   return (
     <span
+      ref={chipRef}
       className="relative inline-flex items-center justify-center"
-      onMouseEnter={() => setShowTooltip(true)}
+      onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShowTooltip(false)}
     >
       <span
@@ -34,33 +45,38 @@ function CitationChip({ citationId }: { citationId: number }) {
         {citationId}
       </span>
 
-      {/* Tooltip - positioned to the right */}
+      {/* Tooltip - positioned to the LEFT of the panel, outside the container */}
       {showTooltip && citation && (
         <div
-          className="absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 pointer-events-none"
-          style={{ width: '380px' }}
+          className="fixed z-[100] pointer-events-none"
+          style={{
+            width: '380px',
+            right: '620px', // Right panel is 600px wide + some margin
+            top: tooltipY,
+            transform: 'translateY(-50%)',
+          }}
         >
-          {/* Arrow pointing left */}
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1.5 w-3 h-3 bg-white border-l border-b border-gray-200 rotate-45" />
-
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-5">
-            {/* Citation text - larger, more readable */}
-            <p className="text-[15px] leading-[1.6] text-[#141414]">
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4">
+            {/* Citation text - 13px, full text */}
+            <p className="text-[13px] leading-[1.7] text-[#141414]">
               {citation.fullText || citation.text}
             </p>
 
             {/* Divider */}
-            <div className="border-t border-gray-100 my-4" />
+            <div className="border-t border-gray-100 my-3" />
 
-            {/* Source info */}
-            <div className="flex items-center justify-between text-[13px] text-[#8A8A8A]">
+            {/* Source info - smaller */}
+            <div className="flex items-center justify-between text-[10px] text-[#8A8A8A]">
               <span className="truncate pr-4">{citation.fileName}</span>
-              <span className="flex items-center gap-1.5 shrink-0">
+              <span className="flex items-center gap-1 shrink-0">
                 <span>§</span>
                 <span>Page {citation.page}</span>
               </span>
             </div>
           </div>
+
+          {/* Arrow pointing right */}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1.5 w-3 h-3 bg-white border-r border-t border-gray-200 rotate-45" />
         </div>
       )}
     </span>
