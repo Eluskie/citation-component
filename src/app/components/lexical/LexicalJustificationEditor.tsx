@@ -16,6 +16,7 @@ import {
 import { Plus, PanelRight } from 'lucide-react';
 import { CitationNode, $createCitationNode, CITATION_NODE_VERSION } from './CitationNode';
 import { CitationPlugin, insertCitation } from './CitationPlugin';
+import { CitationProvider, CitationData } from './CitationContext';
 
 // Theme for Lexical editor
 const theme = {
@@ -286,12 +287,14 @@ const LexicalCitationHeader = ({
 export interface LexicalJustificationEditorProps {
   mode?: 'scroll-strip' | 'sidebar' | 'popover';
   label?: string;
+  citations?: CitationData[];
   onChange?: (editorState: EditorState) => void;
 }
 
 export function LexicalJustificationEditor({
   mode = 'scroll-strip',
   label = 'Begründung',
+  citations = [],
   onChange,
 }: LexicalJustificationEditorProps) {
   const [sidebarVisible, setSidebarVisible] = useState(true);
@@ -320,19 +323,20 @@ export function LexicalJustificationEditor({
   );
 
   return (
-    <div className="w-full">
-      {/* Header with label on left, citation tools on right - same line */}
-      <LexicalCitationHeader
-        label={label}
-        mode={mode}
-        sidebarVisible={sidebarVisible}
-        onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
-        onInsertCitation={handleInsertCitation}
-      />
+    <CitationProvider citations={citations}>
+      <div className="w-full">
+        {/* Header with label on left, citation tools on right - same line */}
+        <LexicalCitationHeader
+          label={label}
+          mode={mode}
+          sidebarVisible={sidebarVisible}
+          onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
+          onInsertCitation={handleInsertCitation}
+        />
 
-      {/* Editor area */}
-      {/* Key forces remount when CitationNode module is hot-reloaded, fixing HMR node mismatch */}
-      <LexicalComposer key={CITATION_NODE_VERSION} initialConfig={initialConfig}>
+        {/* Editor area */}
+        {/* Key forces remount when CitationNode module is hot-reloaded, fixing HMR node mismatch */}
+        <LexicalComposer key={CITATION_NODE_VERSION} initialConfig={initialConfig}>
         <div className="bg-white rounded-[6px] border border-[#E1E1E1] p-3 relative overflow-hidden">
           <div className="flex relative">
             <RichTextPlugin
@@ -367,6 +371,7 @@ export function LexicalJustificationEditor({
         <OnChangePlugin onChange={handleChange} />
         <EditorRefPlugin onEditorReady={setEditorInstance} />
       </LexicalComposer>
-    </div>
+      </div>
+    </CitationProvider>
   );
 }

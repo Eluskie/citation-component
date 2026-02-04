@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import svgPaths from '../imports/svg-kz4mqjgf9s';
 import { JustificationEditor } from './components/JustificationEditor';
-import { LexicalJustificationEditor } from './components/lexical';
+import { LexicalJustificationEditor, CitationData } from './components/lexical';
 import { ChevronDown, Search, Filter, Plus, X, Maximize2, Minimize2, MoreHorizontal, Paperclip, ChevronRight, ChevronUp, FileText, Check } from 'lucide-react';
 
 // --- Icons using the imported paths ---
@@ -161,6 +161,7 @@ const TableRow = ({
 interface Citation {
   page: number;
   text: string;
+  fullText?: string; // Longer text for tooltip
   id: number;
 }
 
@@ -169,9 +170,75 @@ interface ReferenceDoc {
   citations: Citation[];
 }
 
+// Citation row with tooltip on the LEFT side of the entire row
+const CitationRow = ({ citation, fileName }: { citation: Citation; fileName: string }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipY, setTooltipY] = useState(0);
+  const rowRef = React.useRef<HTMLDivElement>(null);
+
+  const handleMouseEnter = () => {
+    if (rowRef.current) {
+      const rect = rowRef.current.getBoundingClientRect();
+      setTooltipY(rect.top + rect.height / 2);
+    }
+    setShowTooltip(true);
+  };
+
+  return (
+    <div
+      ref={rowRef}
+      className="relative px-3 py-2.5 flex items-start justify-between gap-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0 cursor-default"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={() => setShowTooltip(false)}
+    >
+      {/* Tooltip - positioned to the LEFT of the entire row, outside the container */}
+      {showTooltip && (
+        <div
+          className="fixed z-[100] pointer-events-none"
+          style={{
+            width: '380px',
+            right: '620px', // Right panel is 600px wide + some margin
+            top: tooltipY,
+            transform: 'translateY(-50%)',
+          }}
+        >
+          <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4">
+            {/* Citation text - 13px, full text */}
+            <p className="text-[13px] leading-[1.7] text-[#141414]">
+              {citation.fullText || citation.text}
+            </p>
+
+            {/* Divider */}
+            <div className="border-t border-gray-100 my-3" />
+
+            {/* Source info - smaller */}
+            <div className="flex items-center justify-between text-[10px] text-[#8A8A8A]">
+              <span className="truncate pr-4">{fileName}</span>
+              <span className="flex items-center gap-1 shrink-0">
+                <span>§</span>
+                <span>Page {citation.page}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Arrow pointing right */}
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1.5 w-3 h-3 bg-white border-r border-t border-gray-200 rotate-45" />
+        </div>
+      )}
+
+      <div className="text-[13px] leading-snug text-[#141414]">
+        <span className="text-[#8A8A8A] mr-1">S. {citation.page}</span>
+        {citation.text}
+      </div>
+      <div className="shrink-0 bg-[#EAEAEA] text-[#141414] px-1.5 py-0.5 rounded text-[11px] font-[500] min-w-[18px] text-center">
+        {citation.id}
+      </div>
+    </div>
+  );
+};
+
 const ReferenceGroup = ({ doc, isCollapsed = false }: { doc: ReferenceDoc; isCollapsed?: boolean }) => {
   const [collapsed, setCollapsed] = useState(isCollapsed);
-  const citationCount = doc.citations.length;
 
   return (
     <div className="border border-gray-200 rounded-md overflow-hidden bg-white">
@@ -195,19 +262,11 @@ const ReferenceGroup = ({ doc, isCollapsed = false }: { doc: ReferenceDoc; isCol
           <ChevronDown size={14} className={`text-gray-400 ml-1 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} />
         </div>
       </div>
-      
+
       {!collapsed && (
         <div className="border-t border-gray-100">
-          {doc.citations.map((cite, i) => (
-            <div key={i} className="px-3 py-2.5 flex items-start justify-between gap-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0">
-              <div className="text-[13px] leading-snug text-[#141414]">
-                <span className="text-[#8A8A8A] mr-1">S. {cite.page}</span>
-                {cite.text}
-              </div>
-              <div className="shrink-0 bg-[#EAEAEA] text-[#141414] px-1.5 py-0.5 rounded text-[11px] font-[500] min-w-[18px] text-center">
-                {cite.id}
-              </div>
-            </div>
+          {doc.citations.map((cite) => (
+            <CitationRow key={cite.id} citation={cite} fileName={doc.fileName} />
           ))}
         </div>
       )}
@@ -221,56 +280,73 @@ const RightPanel = () => {
   >('scroll-strip');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  // Long mock text for tooltip testing (approximately 10 lines)
+  const mockFullText = "Das Leitungsorgan trägt die Gesamtverantwortung für die Informationssicherheitspolitik des Unternehmens und muss sicherstellen, dass angemessene Ressourcen für die Implementierung und Aufrechterhaltung der Sicherheitsmaßnahmen bereitgestellt werden. Die Politik muss regelmäßig überprüft und an neue Bedrohungen und regulatorische Anforderungen angepasst werden. Darüber hinaus ist das Leitungsorgan verpflichtet, eine Kultur der Sicherheitsbewusstheit im gesamten Unternehmen zu fördern. Die Überwachung der Wirksamkeit der Sicherheitsmaßnahmen erfolgt durch regelmäßige Berichte an den Vorstand, der mindestens vierteljährlich über den Status der Informationssicherheit informiert wird. Bei wesentlichen Sicherheitsvorfällen ist eine sofortige Eskalation an das Leitungsorgan erforderlich. Die Verantwortung umfasst auch die Genehmigung des jährlichen Sicherheitsbudgets sowie die Freigabe strategischer Sicherheitsinitiativen.";
+
   // Define all distinct documents
   const doc1: ReferenceDoc = {
     fileName: "Information Security Policy.pdf",
-    citations: [{ page: 4, text: "Rolle des Vorstands bei der Informationssicherheitspolitik", id: 1 }]
+    citations: [{ page: 4, text: "Rolle des Vorstands bei der Informationssicherheitspolitik", fullText: mockFullText, id: 1 }]
   };
 
   const doc2_multi: ReferenceDoc = {
     fileName: "Internal Audit Report 2024.pdf",
     citations: [
-      { page: 12, text: "Audit findings regarding risk appetite framework", id: 4 },
-      { page: 12, text: "Observations on board oversight mechanisms", id: 5 },
-      { page: 14, text: "Recommendations for ICT governance structure", id: 6 },
-      { page: 15, text: "Management response to audit finding #4", id: 7 },
-      { page: 18, text: "Timeline for remediation implementation", id: 8 },
-      { page: 22, text: "Final conclusion on control effectiveness", id: 9 }
+      { page: 12, text: "Audit findings regarding risk appetite framework", fullText: mockFullText, id: 4 },
+      { page: 12, text: "Observations on board oversight mechanisms", fullText: mockFullText, id: 5 },
+      { page: 14, text: "Recommendations for ICT governance structure", fullText: mockFullText, id: 6 },
+      { page: 15, text: "Management response to audit finding #4", fullText: mockFullText, id: 7 },
+      { page: 18, text: "Timeline for remediation implementation", fullText: mockFullText, id: 8 },
+      { page: 22, text: "Final conclusion on control effectiveness", fullText: mockFullText, id: 9 }
     ]
   };
 
   const doc3: ReferenceDoc = {
     fileName: "Outsourcing Policy.pdf",
-    citations: [{ page: 4, text: "Verantwortlichkeiten des Vorstands für Outsourcing-Richtlinie", id: 2 }]
+    citations: [{ page: 4, text: "Verantwortlichkeiten des Vorstands für Outsourcing-Richtlinie", fullText: mockFullText, id: 2 }]
   };
 
   const doc4: ReferenceDoc = {
     fileName: "Board Meeting Minutes Q1.pdf",
-    citations: [{ page: 3, text: "Approval of new ICT strategy", id: 10 }]
+    citations: [{ page: 3, text: "Approval of new ICT strategy", fullText: mockFullText, id: 10 }]
   };
 
   const doc5: ReferenceDoc = {
     fileName: "Risk Management Framework.pdf",
-    citations: [{ page: 8, text: "Roles and responsibilities definition", id: 11 }, { page: 9, text: "Reporting lines structure", id: 12 }]
+    citations: [
+      { page: 8, text: "Roles and responsibilities definition", fullText: mockFullText, id: 11 },
+      { page: 9, text: "Reporting lines structure", fullText: mockFullText, id: 12 }
+    ]
   };
 
   const doc6: ReferenceDoc = {
     fileName: "IT Governance Charter.pdf",
-    citations: [{ page: 2, text: "Delegation of authority matrix", id: 13 }]
+    citations: [{ page: 2, text: "Delegation of authority matrix", fullText: mockFullText, id: 13 }]
   };
 
   const doc7: ReferenceDoc = {
     fileName: "External Regulator Report.pdf",
-    citations: [{ page: 45, text: "Compliance assessment summary", id: 14 }]
+    citations: [{ page: 45, text: "Compliance assessment summary", fullText: mockFullText, id: 14 }]
   };
 
   const doc8: ReferenceDoc = {
     fileName: "Annual Report.pdf",
-    citations: [{ page: 88, text: "Risk declaration statement", id: 15 }]
+    citations: [{ page: 88, text: "Risk declaration statement", fullText: mockFullText, id: 15 }]
   };
 
   // Combine into one single list
   const allDocs = [doc1, doc2_multi, doc3, doc4, doc5, doc6, doc7, doc8];
+
+  // Flatten citations for tooltip data
+  const allCitations: CitationData[] = allDocs.flatMap((doc) =>
+    doc.citations.map((cite) => ({
+      id: cite.id,
+      text: cite.text,
+      fullText: cite.fullText,
+      page: cite.page,
+      fileName: doc.fileName,
+    }))
+  );
 
   return (
     <div className="fixed top-0 right-0 h-full w-[600px] flex flex-col bg-white border-l border-gray-200 shadow-2xl z-50">
@@ -419,6 +495,7 @@ const RightPanel = () => {
             <LexicalJustificationEditor
               mode={citationMode.replace('lexical-', '') as 'scroll-strip' | 'sidebar' | 'popover'}
               label="Begründung"
+              citations={allCitations}
             />
           ) : (
             <JustificationEditor mode={citationMode} label="Begründung" />
