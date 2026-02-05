@@ -7,6 +7,7 @@ import {
   $createRangeSelection,
   $isTextNode,
   $getNearestNodeFromDOMNode,
+  $getNodeByKey,
   COMMAND_PRIORITY_HIGH,
   DROP_COMMAND,
   DRAGOVER_COMMAND,
@@ -15,7 +16,7 @@ import {
   RangeSelection,
   LexicalEditor,
 } from 'lexical';
-import { $createCitationNode } from './CitationNode';
+import { $createCitationNode, $isCitationNode } from './CitationNode';
 
 // Store for the last known selection (used for click-to-insert when editor loses focus)
 let lastKnownSelection: RangeSelection | null = null;
@@ -123,7 +124,9 @@ export function CitationPlugin(): null {
         if (types.includes('application/x-citation')) {
           event.preventDefault();
           if (event.dataTransfer) {
-            event.dataTransfer.dropEffect = 'copy';
+            // Use 'move' effect if dragging from within editor, 'copy' if from sidebar
+            const isMoveOperation = types.includes('application/x-citation-move');
+            event.dataTransfer.dropEffect = isMoveOperation ? 'move' : 'copy';
           }
 
           // Show drop indicator at caret position
@@ -159,7 +162,7 @@ export function CitationPlugin(): null {
     document.addEventListener('dragend', handleDragEnd);
     document.addEventListener('drop', hideIndicator);
 
-    // Handle drop events for citations
+    // Handle drop events for citations (both insert and move)
     const removeDropListener = editor.registerCommand(
       DROP_COMMAND,
       (event: DragEvent) => {
@@ -170,6 +173,8 @@ export function CitationPlugin(): null {
           hideIndicator(); // Hide indicator on drop
 
           const citationId = parseInt(data, 10);
+          // Check if this is a move operation (dragged from within editor)
+          const sourceNodeKey = event.dataTransfer?.getData('application/x-citation-move');
 
           // Get drop position using shared helper
           const caretPos = getCaretPosition(event.clientX, event.clientY);
@@ -180,6 +185,14 @@ export function CitationPlugin(): null {
             const domOffset = range.startOffset;
 
             editor.update(() => {
+              // If it's a move operation, remove the source node first
+              if (sourceNodeKey) {
+                const sourceNode = $getNodeByKey(sourceNodeKey);
+                if (sourceNode && $isCitationNode(sourceNode)) {
+                  sourceNode.remove();
+                }
+              }
+
               const lexicalNode = $getNearestNodeFromDOMNode(domNode);
 
               if (lexicalNode) {
@@ -202,6 +215,14 @@ export function CitationPlugin(): null {
             });
           } else {
             editor.update(() => {
+              // If it's a move operation, remove the source node first
+              if (sourceNodeKey) {
+                const sourceNode = $getNodeByKey(sourceNodeKey);
+                if (sourceNode && $isCitationNode(sourceNode)) {
+                  sourceNode.remove();
+                }
+              }
+
               const selection = $getSelection();
               if ($isRangeSelection(selection)) {
                 const citationNode = $createCitationNode(citationId);

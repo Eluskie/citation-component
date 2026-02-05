@@ -15,15 +15,18 @@ import { useCitationData } from './CitationContext';
 // Used to force LexicalComposer remount and re-register nodes
 export const CITATION_NODE_VERSION = Date.now();
 
-// Citation chip component with tooltip
-function CitationChip({ citationId }: { citationId: number }) {
+// Citation chip component with tooltip and drag support
+function CitationChip({ citationId, nodeKey }: { citationId: number; nodeKey: string }) {
   const [showTooltip, setShowTooltip] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [tooltipY, setTooltipY] = useState(0);
   const chipRef = useRef<HTMLSpanElement>(null);
   const { getCitation } = useCitationData();
   const citation = getCitation(citationId);
 
   const handleMouseEnter = () => {
+    // Don't show tooltip while dragging
+    if (isDragging) return;
     if (chipRef.current) {
       const rect = chipRef.current.getBoundingClientRect();
       setTooltipY(rect.top + rect.height / 2);
@@ -31,22 +34,55 @@ function CitationChip({ citationId }: { citationId: number }) {
     setShowTooltip(true);
   };
 
+  const handleMouseLeave = () => {
+    setShowTooltip(false);
+  };
+
+  const handleDragStart = (e: React.DragEvent) => {
+    setIsDragging(true);
+    setShowTooltip(false); // Hide tooltip immediately when drag starts
+
+    // Set drag data - include both citation ID and node key for move operations
+    e.dataTransfer.setData('application/x-citation', String(citationId));
+    e.dataTransfer.setData('application/x-citation-move', nodeKey);
+    e.dataTransfer.effectAllowed = 'move';
+
+    // Create a drag image
+    if (chipRef.current) {
+      const dragImage = chipRef.current.cloneNode(true) as HTMLElement;
+      dragImage.style.position = 'absolute';
+      dragImage.style.top = '-1000px';
+      document.body.appendChild(dragImage);
+      e.dataTransfer.setDragImage(dragImage, 10, 10);
+      setTimeout(() => document.body.removeChild(dragImage), 0);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
   return (
     <span
       ref={chipRef}
       className="relative inline-flex items-center justify-center"
       onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setShowTooltip(false)}
+      onMouseLeave={handleMouseLeave}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
     >
       <span
-        className="inline-flex items-center justify-center bg-[#EAEAEA] text-[#141414] rounded px-1.5 py-0.5 mx-0.5 text-[11px] font-[500] min-w-[20px] text-center select-none align-middle cursor-default"
+        className={`inline-flex items-center justify-center bg-[#EAEAEA] text-[#141414] rounded px-1.5 py-0.5 mx-0.5 text-[11px] font-[500] min-w-[20px] text-center select-none align-middle cursor-grab active:cursor-grabbing ${
+          isDragging ? 'opacity-50' : ''
+        }`}
         contentEditable={false}
       >
         {citationId}
       </span>
 
       {/* Tooltip - positioned to the LEFT of the panel, outside the container */}
-      {showTooltip && citation && (
+      {showTooltip && !isDragging && citation && (
         <div
           className="fixed z-[100] pointer-events-none"
           style={{
@@ -167,7 +203,7 @@ export class CitationNode extends DecoratorNode<JSX.Element> {
   }
 
   decorate(): JSX.Element {
-    return <CitationChip citationId={this.__citationId} />;
+    return <CitationChip citationId={this.__citationId} nodeKey={this.__key} />;
   }
 
   isInline(): boolean {

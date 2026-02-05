@@ -194,7 +194,7 @@ const LexicalPopover = ({ onInsertCitation }: LexicalPopoverProps) => {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full right-0 mt-1 p-2 bg-white rounded shadow-lg border border-gray-200 flex flex-wrap gap-2 w-[200px] z-50">
+          <div className="absolute bottom-full right-0 mb-1 p-2 bg-white rounded shadow-lg border border-gray-200 flex flex-wrap gap-2 w-[200px] z-50">
             {range(1, 15).map((num) => (
               <div
                 key={num}
