@@ -214,10 +214,7 @@ const CitationRow = ({ citation, fileName }: { citation: Citation; fileName: str
             {/* Source info - smaller */}
             <div className="flex items-center justify-between text-[10px] text-[#8A8A8A]">
               <span className="truncate pr-4">{fileName}</span>
-              <span className="flex items-center gap-1 shrink-0">
-                <span>§</span>
-                <span>Page {citation.page}</span>
-              </span>
+              <span className="shrink-0">Page {citation.page}</span>
             </div>
           </div>
 
@@ -227,7 +224,7 @@ const CitationRow = ({ citation, fileName }: { citation: Citation; fileName: str
       )}
 
       <div className="text-[13px] leading-snug text-[#141414]">
-        <span className="text-[#8A8A8A] mr-1">S. {citation.page} §</span>
+        <span className="text-[#8A8A8A] mr-1">S. {citation.page}</span>
         {citation.text}
       </div>
       <div className="shrink-0 bg-[#EAEAEA] text-[#141414] px-1.5 py-0.5 rounded text-[11px] font-[500] min-w-[18px] text-center">

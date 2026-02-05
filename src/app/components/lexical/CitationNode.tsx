@@ -104,10 +104,7 @@ function CitationChip({ citationId, nodeKey }: { citationId: number; nodeKey: st
             {/* Source info - smaller */}
             <div className="flex items-center justify-between text-[10px] text-[#8A8A8A]">
               <span className="truncate pr-4">{citation.fileName}</span>
-              <span className="flex items-center gap-1 shrink-0">
-                <span>§</span>
-                <span>Page {citation.page}</span>
-              </span>
+              <span className="shrink-0">Page {citation.page}</span>
             </div>
           </div>
 
