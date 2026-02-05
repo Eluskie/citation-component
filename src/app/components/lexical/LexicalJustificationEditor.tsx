@@ -80,17 +80,14 @@ function EditorRefPlugin({
   return null;
 }
 
-// Helper range function
-const range = (start: number, end: number) =>
-  Array.from({ length: end - start + 1 }, (_, i) => start + i);
-
 // Draggable citation chip for Lexical
 interface LexicalDraggableChipProps {
   number: number;
   onInsert: (citationId: number) => void;
+  isUsed?: boolean;
 }
 
-const LexicalDraggableChip = ({ number, onInsert }: LexicalDraggableChipProps) => (
+const LexicalDraggableChip = ({ number, onInsert, isUsed }: LexicalDraggableChipProps) => (
   <div
     draggable
     onDragStart={(e) => {
@@ -98,7 +95,7 @@ const LexicalDraggableChip = ({ number, onInsert }: LexicalDraggableChipProps) =
       e.dataTransfer.effectAllowed = 'copy';
     }}
     onClick={() => onInsert(number)}
-    className="cursor-grab active:cursor-grabbing hover:scale-105 transition-transform select-none"
+    className={`cursor-grab active:cursor-grabbing hover:scale-105 transition-all select-none ${isUsed ? 'opacity-35' : ''}`}
     title={`Click or drag citation ${number}`}
   >
     <div className="bg-[#EAEAEA] text-[#141414] rounded px-1.5 py-0.5 text-[11px] font-[500] min-w-[18px] text-center hover:bg-[#DCDCDC] transition-colors">
@@ -110,9 +107,11 @@ const LexicalDraggableChip = ({ number, onInsert }: LexicalDraggableChipProps) =
 // Lexical-specific scroll strip variation
 interface LexicalScrollStripProps {
   onInsertCitation: (citationId: number) => void;
+  usedCitationIds: Set<number>;
+  availableCitationIds: number[];
 }
 
-const LexicalScrollStrip = ({ onInsertCitation }: LexicalScrollStripProps) => {
+const LexicalScrollStrip = ({ onInsertCitation, usedCitationIds, availableCitationIds }: LexicalScrollStripProps) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [showLeft, setShowLeft] = useState(false);
   const [showRight, setShowRight] = useState(false);
@@ -156,8 +155,8 @@ const LexicalScrollStrip = ({ onInsertCitation }: LexicalScrollStripProps) => {
           onScroll={check}
           className="flex items-center gap-2 overflow-x-auto pb-0 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         >
-          {range(1, 15).map((num) => (
-            <LexicalDraggableChip key={num} number={num} onInsert={onInsertCitation} />
+          {availableCitationIds.map((num) => (
+            <LexicalDraggableChip key={num} number={num} onInsert={onInsertCitation} isUsed={usedCitationIds.has(num)} />
           ))}
         </div>
       </div>
@@ -168,9 +167,11 @@ const LexicalScrollStrip = ({ onInsertCitation }: LexicalScrollStripProps) => {
 // Lexical-specific popover variation
 interface LexicalPopoverProps {
   onInsertCitation: (citationId: number) => void;
+  usedCitationIds: Set<number>;
+  availableCitationIds: number[];
 }
 
-const LexicalPopover = ({ onInsertCitation }: LexicalPopoverProps) => {
+const LexicalPopover = ({ onInsertCitation, usedCitationIds, availableCitationIds }: LexicalPopoverProps) => {
   const [isOpen, setIsOpen] = useState(false);
 
   const handleDragStart = (e: React.DragEvent, number: number) => {
@@ -194,7 +195,7 @@ const LexicalPopover = ({ onInsertCitation }: LexicalPopoverProps) => {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute bottom-full right-0 mb-1 p-2 bg-white rounded shadow-lg border border-gray-200 flex flex-wrap gap-2 w-[200px] z-50">
-            {range(1, 15).map((num) => (
+            {availableCitationIds.map((num) => (
               <div
                 key={num}
                 draggable
@@ -203,7 +204,7 @@ const LexicalPopover = ({ onInsertCitation }: LexicalPopoverProps) => {
                   onInsertCitation(num);
                   setIsOpen(false);
                 }}
-                className="cursor-grab active:cursor-grabbing hover:scale-105 transition-transform select-none"
+                className={`cursor-grab active:cursor-grabbing hover:scale-105 transition-all select-none ${usedCitationIds.has(num) ? 'opacity-35' : ''}`}
                 title={`Click or drag citation ${num}`}
               >
                 <div className="bg-[#EAEAEA] text-[#141414] rounded px-1.5 py-0.5 text-[11px] font-[500] min-w-[18px] text-center hover:bg-[#DCDCDC] transition-colors">
@@ -222,9 +223,11 @@ const LexicalPopover = ({ onInsertCitation }: LexicalPopoverProps) => {
 interface LexicalSidebarProps {
   visible: boolean;
   onInsertCitation: (citationId: number) => void;
+  usedCitationIds: Set<number>;
+  availableCitationIds: number[];
 }
 
-const LexicalSidebar = ({ visible, onInsertCitation }: LexicalSidebarProps) => {
+const LexicalSidebar = ({ visible, onInsertCitation, usedCitationIds, availableCitationIds }: LexicalSidebarProps) => {
   return (
     <div
       className={`absolute right-0 top-0 bottom-0 w-[40px] flex flex-col items-center gap-1.5 py-1 overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-300 ease-out ${
@@ -233,11 +236,12 @@ const LexicalSidebar = ({ visible, onInsertCitation }: LexicalSidebarProps) => {
           : 'opacity-0 translate-x-full pointer-events-none'
       }`}
     >
-      {range(1, 15).map((num) => (
+      {availableCitationIds.map((num) => (
         <LexicalDraggableChip
           key={num}
           number={num}
           onInsert={onInsertCitation}
+          isUsed={usedCitationIds.has(num)}
         />
       ))}
     </div>
@@ -251,6 +255,8 @@ interface LexicalCitationHeaderProps {
   sidebarVisible?: boolean;
   onToggleSidebar?: () => void;
   onInsertCitation: (citationId: number) => void;
+  usedCitationIds: Set<number>;
+  availableCitationIds: number[];
 }
 
 const LexicalCitationHeader = ({
@@ -259,6 +265,8 @@ const LexicalCitationHeader = ({
   sidebarVisible,
   onToggleSidebar,
   onInsertCitation,
+  usedCitationIds,
+  availableCitationIds,
 }: LexicalCitationHeaderProps) => {
   return (
     <div className="flex items-center justify-between mb-2">
@@ -266,8 +274,8 @@ const LexicalCitationHeader = ({
       <span className="text-[13px] font-[500] text-[#141414]">{label}</span>
 
       {/* Citation tools on the right */}
-      {mode === 'scroll-strip' && <LexicalScrollStrip onInsertCitation={onInsertCitation} />}
-      {mode === 'popover' && <LexicalPopover onInsertCitation={onInsertCitation} />}
+      {mode === 'scroll-strip' && <LexicalScrollStrip onInsertCitation={onInsertCitation} usedCitationIds={usedCitationIds} availableCitationIds={availableCitationIds} />}
+      {mode === 'popover' && <LexicalPopover onInsertCitation={onInsertCitation} usedCitationIds={usedCitationIds} availableCitationIds={availableCitationIds} />}
       {mode === 'sidebar' && (
         <button
           onClick={onToggleSidebar}
@@ -298,6 +306,10 @@ export function LexicalJustificationEditor({
 }: LexicalJustificationEditorProps) {
   const [sidebarVisible, setSidebarVisible] = useState(true);
   const [editorInstance, setEditorInstance] = useState<LexicalEditor | null>(null);
+  const [usedCitationIds, setUsedCitationIds] = useState<Set<number>>(new Set());
+
+  // Get available citation IDs from props
+  const availableCitationIds = citations.map(c => c.id);
 
   // Merge base config with editorState (needs to be fresh for each mount)
   const initialConfig = {
@@ -307,6 +319,21 @@ export function LexicalJustificationEditor({
 
   const handleChange = useCallback(
     (editorState: EditorState) => {
+      // Extract used citation IDs from editor state
+      editorState.read(() => {
+        const root = $getRoot();
+        const usedIds = new Set<number>();
+        const processNode = (node: any) => {
+          if (node.getType?.() === 'citation') {
+            usedIds.add(node.getCitationId());
+          }
+          if (node.getChildren) {
+            node.getChildren().forEach(processNode);
+          }
+        };
+        processNode(root);
+        setUsedCitationIds(usedIds);
+      });
       onChange?.(editorState);
     },
     [onChange]
@@ -321,6 +348,26 @@ export function LexicalJustificationEditor({
     [editorInstance]
   );
 
+  // Extract used citations on initial load
+  useEffect(() => {
+    if (editorInstance) {
+      editorInstance.getEditorState().read(() => {
+        const root = $getRoot();
+        const usedIds = new Set<number>();
+        const processNode = (node: any) => {
+          if (node.getType?.() === 'citation') {
+            usedIds.add(node.getCitationId());
+          }
+          if (node.getChildren) {
+            node.getChildren().forEach(processNode);
+          }
+        };
+        processNode(root);
+        setUsedCitationIds(usedIds);
+      });
+    }
+  }, [editorInstance]);
+
   return (
     <CitationProvider citations={citations}>
       <div className="w-full">
@@ -331,6 +378,8 @@ export function LexicalJustificationEditor({
           sidebarVisible={sidebarVisible}
           onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
           onInsertCitation={handleInsertCitation}
+          usedCitationIds={usedCitationIds}
+          availableCitationIds={availableCitationIds}
         />
 
         {/* Editor area */}
@@ -359,6 +408,8 @@ export function LexicalJustificationEditor({
               <LexicalSidebar
                 visible={sidebarVisible}
                 onInsertCitation={handleInsertCitation}
+                usedCitationIds={usedCitationIds}
+                availableCitationIds={availableCitationIds}
               />
             )}
           </div>
