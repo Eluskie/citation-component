@@ -368,6 +368,20 @@ export function LexicalJustificationEditor({
     }
   }, [editorInstance]);
 
+  // Listen for external "add citation to reasoning" events
+  useEffect(() => {
+    const handleAddCitationEvent = (event: CustomEvent<{ citationId: number }>) => {
+      if (editorInstance && event.detail?.citationId) {
+        insertCitation(editorInstance, event.detail.citationId);
+      }
+    };
+
+    window.addEventListener('add-citation-to-reasoning', handleAddCitationEvent as EventListener);
+    return () => {
+      window.removeEventListener('add-citation-to-reasoning', handleAddCitationEvent as EventListener);
+    };
+  }, [editorInstance]);
+
   return (
     <CitationProvider citations={citations}>
       <div className="w-full">

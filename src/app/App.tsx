@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { LexicalJustificationEditor, CitationData } from './components/lexical';
-import { ChevronDown, ChevronRight, Plus, X, FileText, Check, Link2, Search, Filter, Highlighter } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, X, FileText, Check, Link2, Search, Filter, Highlighter, ArrowUp } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from './components/ui/tooltip';
 import { Input } from './components/ui/input';
@@ -387,12 +387,14 @@ const CitationRow = ({
   citation,
   fileName,
   onUpdateTitle,
-  onDelete
+  onDelete,
+  onAddToReasoning
 }: {
   citation: Citation;
   fileName: string;
   onUpdateTitle?: (id: number, title: string) => void;
   onDelete?: (id: number) => void;
+  onAddToReasoning?: (citation: Citation) => void;
 }) => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [tooltipY, setTooltipY] = useState(0);
@@ -484,6 +486,23 @@ const CitationRow = ({
         </div>
       )}
 
+      {/* Add to reasoning button - appears on hover, only for saved citations */}
+      {!citation.isNew && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={() => onAddToReasoning?.(citation)}
+              className="p-0.5 rounded hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+            >
+              <ArrowUp size={14} className="text-gray-400 hover:text-[#141414] transition-colors" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
+            Add to reasoning
+          </TooltipContent>
+        </Tooltip>
+      )}
+
       {/* Delete/Cancel button - appears on hover, right side before page number */}
       <Tooltip>
         <TooltipTrigger asChild>
@@ -513,13 +532,15 @@ const ReferenceGroup = ({
   isCollapsed = false,
   onUnlink,
   onUpdateCitationTitle,
-  onDeleteCitation
+  onDeleteCitation,
+  onAddCitationToReasoning
 }: {
   doc: ReferenceDoc;
   isCollapsed?: boolean;
   onUnlink?: (docFileName: string) => void;
   onUpdateCitationTitle?: (citationId: number, title: string) => void;
   onDeleteCitation?: (citationId: number) => void;
+  onAddCitationToReasoning?: (citation: Citation, fileName: string) => void;
 }) => {
   const [collapsed, setCollapsed] = useState(isCollapsed);
   const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
@@ -589,6 +610,7 @@ const ReferenceGroup = ({
               fileName={doc.fileName}
               onUpdateTitle={onUpdateCitationTitle}
               onDelete={onDeleteCitation}
+              onAddToReasoning={(c) => onAddCitationToReasoning?.(c, doc.fileName)}
             />
           ))}
         </div>
@@ -642,6 +664,15 @@ const RealContentPanel = ({
       ...doc,
       citations: doc.citations.filter(cite => cite.id !== citationId)
     })));
+  };
+
+  // Handle adding citation to reasoning
+  // Dispatches a custom event that the editor can listen to
+  const handleAddCitationToReasoning = (citation: Citation, fileName: string) => {
+    const event = new CustomEvent('add-citation-to-reasoning', {
+      detail: { citationId: citation.id, fileName }
+    });
+    window.dispatchEvent(event);
   };
 
   return (
@@ -723,6 +754,7 @@ const RealContentPanel = ({
               onUnlink={(fileName) => setLinkedDocs(prev => prev.filter(d => d.fileName !== fileName))}
               onUpdateCitationTitle={handleUpdateCitationTitle}
               onDeleteCitation={handleDeleteCitation}
+              onAddCitationToReasoning={handleAddCitationToReasoning}
             />
           ))}
         </div>
