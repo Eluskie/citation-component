@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import svgPaths from '../imports/svg-kz4mqjgf9s';
-import { JustificationEditor } from './components/JustificationEditor';
 import { LexicalJustificationEditor, CitationData } from './components/lexical';
-import { ChevronDown, Search, Filter, Plus, X, Maximize2, Minimize2, MoreHorizontal, Paperclip, ChevronRight, ChevronUp, FileText, Check } from 'lucide-react';
+import { ChevronDown, Search, Filter, Plus, X, Maximize2, Minimize2, MoreHorizontal, Paperclip, ChevronRight, ChevronUp, FileText, Check, Link2 } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
+import { Tooltip, TooltipContent, TooltipTrigger } from './components/ui/tooltip';
+import { Input } from './components/ui/input';
 
 // --- Icons using the imported paths ---
 
@@ -223,10 +225,13 @@ const CitationRow = ({ citation, fileName }: { citation: Citation; fileName: str
         </div>
       )}
 
-      <div className="text-[13px] leading-snug text-[#141414]">
-        <span className="text-[#8A8A8A] mr-1">S. {citation.page}</span>
+      {/* Title first */}
+      <div className="text-[13px] leading-snug text-[#141414] flex-1">
         {citation.text}
       </div>
+      {/* Page number */}
+      <span className="text-[#8A8A8A] text-[13px] shrink-0">S. {citation.page}</span>
+      {/* Citation badge */}
       <div className="shrink-0 bg-[#EAEAEA] text-[#141414] px-1.5 py-0.5 rounded text-[11px] font-[500] min-w-[18px] text-center">
         {citation.id}
       </div>
@@ -234,8 +239,27 @@ const CitationRow = ({ citation, fileName }: { citation: Citation; fileName: str
   );
 };
 
-const ReferenceGroup = ({ doc, isCollapsed = false }: { doc: ReferenceDoc; isCollapsed?: boolean }) => {
+const ReferenceGroup = ({
+  doc,
+  isCollapsed = false,
+  onUnlink
+}: {
+  doc: ReferenceDoc;
+  isCollapsed?: boolean;
+  onUnlink?: (docFileName: string) => void;
+}) => {
   const [collapsed, setCollapsed] = useState(isCollapsed);
+  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+
+  const handleUnlink = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowUnlinkConfirm(true);
+  };
+
+  const confirmUnlink = () => {
+    onUnlink?.(doc.fileName);
+    setShowUnlinkConfirm(false);
+  };
 
   return (
     <div className="border border-gray-200 rounded-md overflow-hidden bg-white">
@@ -256,11 +280,47 @@ const ReferenceGroup = ({ doc, isCollapsed = false }: { doc: ReferenceDoc; isCol
               {cite.id}
             </span>
           ))}
-          <ChevronDown size={14} className={`text-gray-400 ml-1 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} />
+          {/* Unlink (X) button with tooltip */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleUnlink}
+                className="p-1 rounded hover:bg-gray-100 transition-colors ml-1 group"
+              >
+                <X size={14} className="text-gray-400 group-hover:text-red-500 transition-colors" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
+              Click to unlink
+            </TooltipContent>
+          </Tooltip>
+          {/* Chevron */}
+          <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
-      {!collapsed && (
+      {/* Inline unlink confirmation - subtle, single line */}
+      {showUnlinkConfirm && (
+        <div className="border-t border-gray-100 px-3 py-2 flex items-center justify-between bg-[#FAFAFA]">
+          <span className="text-[13px] text-[#525252]">Unlink this document?</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={confirmUnlink}
+              className="px-2.5 py-1 text-[13px] font-[500] text-[#141414] hover:bg-gray-200 rounded transition-colors"
+            >
+              Unlink
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowUnlinkConfirm(false); }}
+              className="px-2.5 py-1 text-[13px] text-[#8A8A8A] hover:text-[#141414] hover:bg-gray-200 rounded transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!collapsed && !showUnlinkConfirm && (
         <div className="border-t border-gray-100">
           {doc.citations.map((cite) => (
             <CitationRow key={cite.id} citation={cite} fileName={doc.fileName} />
@@ -271,68 +331,97 @@ const ReferenceGroup = ({ doc, isCollapsed = false }: { doc: ReferenceDoc; isCol
   );
 };
 
+// Available documents pool for linking
+const DOCUMENT_POOL: ReferenceDoc[] = [
+  { fileName: "Compliance Guidelines 2024.pdf", citations: [] },
+  { fileName: "Data Protection Policy.pdf", citations: [] },
+  { fileName: "Business Continuity Plan.pdf", citations: [] },
+  { fileName: "Internal Control Standards.pdf", citations: [] },
+  { fileName: "Vendor Management Policy.pdf", citations: [] },
+  { fileName: "Incident Response Plan.pdf", citations: [] },
+];
+
 const RightPanel = () => {
   const [citationMode, setCitationMode] = useState<
-    'scroll-strip' | 'sidebar' | 'popover' | 'lexical-scroll-strip' | 'lexical-sidebar' | 'lexical-popover'
+    'scroll-strip' | 'sidebar' | 'popover'
   >('scroll-strip');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
+  const [linkSearchQuery, setLinkSearchQuery] = useState("");
 
   // Long mock text for tooltip testing (approximately 10 lines)
   const mockFullText = "Das Leitungsorgan trägt die Gesamtverantwortung für die Informationssicherheitspolitik des Unternehmens und muss sicherstellen, dass angemessene Ressourcen für die Implementierung und Aufrechterhaltung der Sicherheitsmaßnahmen bereitgestellt werden. Die Politik muss regelmäßig überprüft und an neue Bedrohungen und regulatorische Anforderungen angepasst werden. Darüber hinaus ist das Leitungsorgan verpflichtet, eine Kultur der Sicherheitsbewusstheit im gesamten Unternehmen zu fördern. Die Überwachung der Wirksamkeit der Sicherheitsmaßnahmen erfolgt durch regelmäßige Berichte an den Vorstand, der mindestens vierteljährlich über den Status der Informationssicherheit informiert wird. Bei wesentlichen Sicherheitsvorfällen ist eine sofortige Eskalation an das Leitungsorgan erforderlich. Die Verantwortung umfasst auch die Genehmigung des jährlichen Sicherheitsbudgets sowie die Freigabe strategischer Sicherheitsinitiativen.";
 
-  // Define all distinct documents
-  const doc1: ReferenceDoc = {
-    fileName: "Information Security Policy.pdf",
-    citations: [{ page: 4, text: "Rolle des Vorstands bei der Informationssicherheitspolitik", fullText: mockFullText, id: 1 }]
+  // Define initial documents
+  const initialDocs: ReferenceDoc[] = [
+    {
+      fileName: "Information Security Policy.pdf",
+      citations: [{ page: 4, text: "Rolle des Vorstands bei der Informationssicherheitspolitik", fullText: mockFullText, id: 1 }]
+    },
+    {
+      fileName: "Internal Audit Report 2024.pdf",
+      citations: [
+        { page: 12, text: "Audit findings regarding risk appetite framework", fullText: mockFullText, id: 4 },
+        { page: 12, text: "Observations on board oversight mechanisms", fullText: mockFullText, id: 5 },
+        { page: 14, text: "Recommendations for ICT governance structure", fullText: mockFullText, id: 6 },
+        { page: 15, text: "Management response to audit finding #4", fullText: mockFullText, id: 7 },
+        { page: 18, text: "Timeline for remediation implementation", fullText: mockFullText, id: 8 },
+        { page: 22, text: "Final conclusion on control effectiveness", fullText: mockFullText, id: 9 }
+      ]
+    },
+    {
+      fileName: "Outsourcing Policy.pdf",
+      citations: [{ page: 4, text: "Verantwortlichkeiten des Vorstands für Outsourcing-Richtlinie", fullText: mockFullText, id: 2 }]
+    },
+    {
+      fileName: "Board Meeting Minutes Q1.pdf",
+      citations: [{ page: 3, text: "Approval of new ICT strategy", fullText: mockFullText, id: 10 }]
+    },
+    {
+      fileName: "Risk Management Framework.pdf",
+      citations: [
+        { page: 8, text: "Roles and responsibilities definition", fullText: mockFullText, id: 11 },
+        { page: 9, text: "Reporting lines structure", fullText: mockFullText, id: 12 }
+      ]
+    },
+    {
+      fileName: "IT Governance Charter.pdf",
+      citations: [{ page: 2, text: "Delegation of authority matrix", fullText: mockFullText, id: 13 }]
+    },
+    {
+      fileName: "External Regulator Report.pdf",
+      citations: [{ page: 45, text: "Compliance assessment summary", fullText: mockFullText, id: 14 }]
+    },
+    {
+      fileName: "Annual Report.pdf",
+      citations: [{ page: 88, text: "Risk declaration statement", fullText: mockFullText, id: 15 }]
+    }
+  ];
+
+  // State for linked documents
+  const [linkedDocs, setLinkedDocs] = useState<ReferenceDoc[]>(initialDocs);
+
+  // Filter available documents for linking (not already linked)
+  const availableForLinking = DOCUMENT_POOL.filter(
+    poolDoc => !linkedDocs.some(linked => linked.fileName === poolDoc.fileName)
+  ).filter(doc =>
+    doc.fileName.toLowerCase().includes(linkSearchQuery.toLowerCase())
+  );
+
+  // Handle linking a document
+  const handleLinkDocument = (doc: ReferenceDoc) => {
+    setLinkedDocs(prev => [...prev, doc]);
+    setLinkPopoverOpen(false);
+    setLinkSearchQuery("");
   };
 
-  const doc2_multi: ReferenceDoc = {
-    fileName: "Internal Audit Report 2024.pdf",
-    citations: [
-      { page: 12, text: "Audit findings regarding risk appetite framework", fullText: mockFullText, id: 4 },
-      { page: 12, text: "Observations on board oversight mechanisms", fullText: mockFullText, id: 5 },
-      { page: 14, text: "Recommendations for ICT governance structure", fullText: mockFullText, id: 6 },
-      { page: 15, text: "Management response to audit finding #4", fullText: mockFullText, id: 7 },
-      { page: 18, text: "Timeline for remediation implementation", fullText: mockFullText, id: 8 },
-      { page: 22, text: "Final conclusion on control effectiveness", fullText: mockFullText, id: 9 }
-    ]
+  // Handle unlinking a document
+  const handleUnlinkDocument = (fileName: string) => {
+    setLinkedDocs(prev => prev.filter(doc => doc.fileName !== fileName));
   };
 
-  const doc3: ReferenceDoc = {
-    fileName: "Outsourcing Policy.pdf",
-    citations: [{ page: 4, text: "Verantwortlichkeiten des Vorstands für Outsourcing-Richtlinie", fullText: mockFullText, id: 2 }]
-  };
-
-  const doc4: ReferenceDoc = {
-    fileName: "Board Meeting Minutes Q1.pdf",
-    citations: [{ page: 3, text: "Approval of new ICT strategy", fullText: mockFullText, id: 10 }]
-  };
-
-  const doc5: ReferenceDoc = {
-    fileName: "Risk Management Framework.pdf",
-    citations: [
-      { page: 8, text: "Roles and responsibilities definition", fullText: mockFullText, id: 11 },
-      { page: 9, text: "Reporting lines structure", fullText: mockFullText, id: 12 }
-    ]
-  };
-
-  const doc6: ReferenceDoc = {
-    fileName: "IT Governance Charter.pdf",
-    citations: [{ page: 2, text: "Delegation of authority matrix", fullText: mockFullText, id: 13 }]
-  };
-
-  const doc7: ReferenceDoc = {
-    fileName: "External Regulator Report.pdf",
-    citations: [{ page: 45, text: "Compliance assessment summary", fullText: mockFullText, id: 14 }]
-  };
-
-  const doc8: ReferenceDoc = {
-    fileName: "Annual Report.pdf",
-    citations: [{ page: 88, text: "Risk declaration statement", fullText: mockFullText, id: 15 }]
-  };
-
-  // Combine into one single list
-  const allDocs = [doc1, doc2_multi, doc3, doc4, doc5, doc6, doc7, doc8];
+  // Use linkedDocs instead of allDocs
+  const allDocs = linkedDocs;
 
   // Flatten citations for tooltip data
   const allCitations: CitationData[] = allDocs.flatMap((doc) =>
@@ -418,9 +507,6 @@ const RightPanel = () => {
                  {citationMode === 'scroll-strip' && 'Scroll Strip'}
                  {citationMode === 'sidebar' && 'Sidebar'}
                  {citationMode === 'popover' && 'Popover'}
-                 {citationMode === 'lexical-scroll-strip' && 'Lexical Scroll Strip'}
-                 {citationMode === 'lexical-sidebar' && 'Lexical Sidebar'}
-                 {citationMode === 'lexical-popover' && 'Lexical Popover'}
               </div>
               <ChevronDown size={14} className="text-gray-400" />
             </button>
@@ -429,10 +515,6 @@ const RightPanel = () => {
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setIsDropdownOpen(false)} />
                 <div className="absolute top-full left-0 mt-1 w-full bg-white border border-gray-200 rounded-[6px] shadow-lg z-20 overflow-hidden">
-                  {/* ContentEditable versions */}
-                  <div className="px-3 py-1.5 text-[11px] text-[#8A8A8A] font-medium border-b border-gray-100">
-                    ContentEditable
-                  </div>
                   <div
                     className={`px-3 py-2 text-[13px] cursor-pointer hover:bg-gray-50 flex items-center justify-between ${citationMode === 'scroll-strip' ? 'bg-gray-50 font-medium' : ''}`}
                     onClick={() => { setCitationMode('scroll-strip'); setIsDropdownOpen(false); }}
@@ -454,32 +536,6 @@ const RightPanel = () => {
                     Popover
                     {citationMode === 'popover' && <Check size={12} />}
                   </div>
-
-                  {/* Lexical versions */}
-                  <div className="px-3 py-1.5 text-[11px] text-[#8A8A8A] font-medium border-t border-b border-gray-100">
-                    Lexical
-                  </div>
-                  <div
-                    className={`px-3 py-2 text-[13px] cursor-pointer hover:bg-gray-50 flex items-center justify-between ${citationMode === 'lexical-scroll-strip' ? 'bg-gray-50 font-medium' : ''}`}
-                    onClick={() => { setCitationMode('lexical-scroll-strip'); setIsDropdownOpen(false); }}
-                  >
-                    Scroll Strip
-                    {citationMode === 'lexical-scroll-strip' && <Check size={12} />}
-                  </div>
-                  <div
-                    className={`px-3 py-2 text-[13px] cursor-pointer hover:bg-gray-50 flex items-center justify-between ${citationMode === 'lexical-sidebar' ? 'bg-gray-50 font-medium' : ''}`}
-                    onClick={() => { setCitationMode('lexical-sidebar'); setIsDropdownOpen(false); }}
-                  >
-                    Sidebar
-                    {citationMode === 'lexical-sidebar' && <Check size={12} />}
-                  </div>
-                  <div
-                    className={`px-3 py-2 text-[13px] cursor-pointer hover:bg-gray-50 flex items-center justify-between ${citationMode === 'lexical-popover' ? 'bg-gray-50 font-medium' : ''}`}
-                    onClick={() => { setCitationMode('lexical-popover'); setIsDropdownOpen(false); }}
-                  >
-                    Popover
-                    {citationMode === 'lexical-popover' && <Check size={12} />}
-                  </div>
                 </div>
               </>
             )}
@@ -488,24 +544,67 @@ const RightPanel = () => {
 
         {/* Begründung (Justification) */}
         <div>
-          {citationMode.startsWith('lexical-') ? (
-            <LexicalJustificationEditor
-              mode={citationMode.replace('lexical-', '') as 'scroll-strip' | 'sidebar' | 'popover'}
-              label="Begründung"
-              citations={allCitations}
-            />
-          ) : (
-            <JustificationEditor mode={citationMode} label="Begründung" />
-          )}
+          <LexicalJustificationEditor
+            mode={citationMode}
+            label="Begründung"
+            citations={allCitations}
+          />
         </div>
 
         {/* Referenzen - Unified List */}
         <div>
-          <div className="text-[13px] font-[500] text-[#141414] mb-2">Referenzen</div>
-          
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[13px] font-[500] text-[#141414]">Referenzen</div>
+
+            {/* Link Document Button with Popover */}
+            <Popover open={linkPopoverOpen} onOpenChange={setLinkPopoverOpen}>
+              <PopoverTrigger asChild>
+                <button className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#F5F5F5] hover:bg-[#EAEAEA] rounded-[5px] text-[13px] font-[500] text-[#141414] transition-colors">
+                  <Link2 size={14} className="text-[#8A8A8A]" />
+                  Link document
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[280px] p-0 bg-white border border-gray-200 rounded-[6px] shadow-lg" align="end">
+                <div className="p-3 border-b border-gray-100">
+                  <Input
+                    placeholder="Search documents..."
+                    value={linkSearchQuery}
+                    onChange={(e) => setLinkSearchQuery(e.target.value)}
+                    className="h-8 text-[13px] bg-[#F9F9F9] border-gray-200 focus:border-gray-300 focus:ring-0"
+                  />
+                </div>
+                <div className="max-h-[200px] overflow-y-auto">
+                  {availableForLinking.length > 0 ? (
+                    availableForLinking.map((doc) => (
+                      <button
+                        key={doc.fileName}
+                        onClick={() => handleLinkDocument(doc)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-gray-50 flex items-center gap-2 transition-colors cursor-pointer border-0 bg-transparent"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span className="text-[13px] text-[#141414] truncate">{doc.fileName}</span>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-4 text-center">
+                      <span className="text-[13px] text-[#8A8A8A]">
+                        {linkSearchQuery ? "No matching documents" : "No documents available"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
+
           <div className="space-y-3">
              {allDocs.map((doc, i) => (
-               <ReferenceGroup key={i} doc={doc} isCollapsed={i > 2} />
+               <ReferenceGroup
+                 key={doc.fileName}
+                 doc={doc}
+                 isCollapsed={i > 2}
+                 onUnlink={handleUnlinkDocument}
+               />
              ))}
           </div>
         </div>

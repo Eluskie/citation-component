@@ -182,13 +182,12 @@ const LexicalPopover = ({ onInsertCitation }: LexicalPopoverProps) => {
 
   return (
     <div className="relative flex items-center gap-3">
-      <span className="text-[13px] text-[#525252] shrink-0">Insert citation</span>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1.5 px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded text-[13px] text-[#141414] transition-colors"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 rounded text-[13px] text-[#141414] font-[500] transition-colors"
       >
         <Plus size={14} />
-        <span>Add</span>
+        <span>Insert citation</span>
       </button>
 
       {isOpen && (
