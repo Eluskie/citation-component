@@ -445,7 +445,8 @@ const CitationRow = ({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setShowTooltip(false)}
     >
-      {showTooltip && !citation.isNew && (
+      {/* Tooltip disabled - edition text not available from backend */}
+      {false && showTooltip && !citation.isNew && (
         <div
           className="fixed z-[100] pointer-events-none"
           style={{
@@ -712,7 +713,7 @@ const RealContentPanel = ({
 
           <Popover open={linkPopoverOpen} onOpenChange={setLinkPopoverOpen}>
             <PopoverTrigger asChild>
-              <button className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#F5F5F5] hover:bg-[#EAEAEA] rounded-[5px] text-[13px] font-[500] text-[#141414] transition-colors">
+              <button className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-gray-100 rounded-[5px] text-[13px] font-[500] text-[#141414] transition-colors">
                 <Link2 size={14} className="text-[#8A8A8A]" />
                 Link document
               </button>

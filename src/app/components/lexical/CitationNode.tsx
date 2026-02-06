@@ -82,7 +82,8 @@ function CitationChip({ citationId, nodeKey }: { citationId: number; nodeKey: st
       </span>
 
       {/* Tooltip - positioned to the LEFT of the panel, outside the container */}
-      {showTooltip && !isDragging && citation && (
+      {/* Tooltip disabled - edition text not available from backend */}
+      {false && showTooltip && !isDragging && citation && (
         <div
           className="fixed z-[100] pointer-events-none"
           style={{
