@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -13,7 +13,7 @@ import {
   EditorState,
   LexicalEditor,
 } from 'lexical';
-import { Plus, PanelRight } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { CitationNode, $createCitationNode, CITATION_NODE_VERSION } from './CitationNode';
 import { CitationPlugin, insertCitation } from './CitationPlugin';
 import { CitationProvider, CitationData } from './CitationContext';
@@ -80,91 +80,7 @@ function EditorRefPlugin({
   return null;
 }
 
-// Draggable citation chip for Lexical
-interface LexicalDraggableChipProps {
-  number: number;
-  onInsert: (citationId: number) => void;
-  isUsed?: boolean;
-}
-
-const LexicalDraggableChip = ({ number, onInsert, isUsed }: LexicalDraggableChipProps) => (
-  <div
-    draggable
-    onDragStart={(e) => {
-      e.dataTransfer.setData('application/x-citation', String(number));
-      e.dataTransfer.effectAllowed = 'copy';
-    }}
-    onClick={() => onInsert(number)}
-    className={`cursor-grab active:cursor-grabbing hover:scale-105 transition-all select-none ${isUsed ? 'opacity-35' : ''}`}
-    title={`Click or drag citation ${number}`}
-  >
-    <div className="bg-[#EAEAEA] text-[#141414] rounded px-1.5 py-0.5 text-[11px] font-[500] min-w-[18px] text-center hover:bg-[#DCDCDC] transition-colors">
-      {number}
-    </div>
-  </div>
-);
-
-// Lexical-specific scroll strip variation
-interface LexicalScrollStripProps {
-  onInsertCitation: (citationId: number) => void;
-  usedCitationIds: Set<number>;
-  availableCitationIds: number[];
-}
-
-const LexicalScrollStrip = ({ onInsertCitation, usedCitationIds, availableCitationIds }: LexicalScrollStripProps) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [showLeft, setShowLeft] = useState(false);
-  const [showRight, setShowRight] = useState(false);
-
-  const check = () => {
-    if (scrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setShowLeft(scrollLeft > 5);
-      setShowRight(scrollLeft < scrollWidth - clientWidth - 5);
-    }
-  };
-
-  useEffect(() => {
-    check();
-    const t = setTimeout(check, 100);
-    window.addEventListener('resize', check);
-    return () => {
-      window.removeEventListener('resize', check);
-      clearTimeout(t);
-    };
-  }, []);
-
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-[13px] text-[#525252] shrink-0">Insert citation</span>
-
-      <div className="relative max-w-[350px]">
-        <div
-          className={`absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none transition-opacity ${
-            showLeft ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-        <div
-          className={`absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none transition-opacity ${
-            showRight ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
-
-        <div
-          ref={scrollRef}
-          onScroll={check}
-          className="flex items-center gap-2 overflow-x-auto pb-0 px-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
-        >
-          {availableCitationIds.map((num) => (
-            <LexicalDraggableChip key={num} number={num} onInsert={onInsertCitation} isUsed={usedCitationIds.has(num)} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Lexical-specific popover variation
+// Popover for inserting citations via click or drag
 interface LexicalPopoverProps {
   onInsertCitation: (citationId: number) => void;
   usedCitationIds: Set<number>;
@@ -219,41 +135,9 @@ const LexicalPopover = ({ onInsertCitation, usedCitationIds, availableCitationId
   );
 };
 
-// Lexical-specific sidebar variation
-interface LexicalSidebarProps {
-  visible: boolean;
-  onInsertCitation: (citationId: number) => void;
-  usedCitationIds: Set<number>;
-  availableCitationIds: number[];
-}
-
-const LexicalSidebar = ({ visible, onInsertCitation, usedCitationIds, availableCitationIds }: LexicalSidebarProps) => {
-  return (
-    <div
-      className={`absolute right-0 top-0 bottom-0 w-[40px] flex flex-col items-center gap-1.5 py-1 overflow-y-auto z-10 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] transition-all duration-300 ease-out ${
-        visible
-          ? 'opacity-100 translate-x-0'
-          : 'opacity-0 translate-x-full pointer-events-none'
-      }`}
-    >
-      {availableCitationIds.map((num) => (
-        <LexicalDraggableChip
-          key={num}
-          number={num}
-          onInsert={onInsertCitation}
-          isUsed={usedCitationIds.has(num)}
-        />
-      ))}
-    </div>
-  );
-};
-
-// Lexical-specific citation header
+// Header with label and popover insert button
 interface LexicalCitationHeaderProps {
   label: string;
-  mode: 'scroll-strip' | 'sidebar' | 'popover';
-  sidebarVisible?: boolean;
-  onToggleSidebar?: () => void;
   onInsertCitation: (citationId: number) => void;
   usedCitationIds: Set<number>;
   availableCitationIds: number[];
@@ -261,50 +145,29 @@ interface LexicalCitationHeaderProps {
 
 const LexicalCitationHeader = ({
   label,
-  mode,
-  sidebarVisible,
-  onToggleSidebar,
   onInsertCitation,
   usedCitationIds,
   availableCitationIds,
 }: LexicalCitationHeaderProps) => {
   return (
     <div className="flex items-center justify-between mb-2">
-      {/* Label on the left */}
       <span className="text-[13px] font-[500] text-[#141414]">{label}</span>
-
-      {/* Citation tools on the right */}
-      {mode === 'scroll-strip' && <LexicalScrollStrip onInsertCitation={onInsertCitation} usedCitationIds={usedCitationIds} availableCitationIds={availableCitationIds} />}
-      {mode === 'popover' && <LexicalPopover onInsertCitation={onInsertCitation} usedCitationIds={usedCitationIds} availableCitationIds={availableCitationIds} />}
-      {mode === 'sidebar' && (
-        <button
-          onClick={onToggleSidebar}
-          className={`flex items-center gap-2 text-[13px] transition-colors ${
-            sidebarVisible ? 'text-[#141414]' : 'text-[#8A8A8A] hover:text-[#525252]'
-          }`}
-        >
-          <PanelRight size={16} strokeWidth={1.5} />
-          <span>Insert citation</span>
-        </button>
-      )}
+      <LexicalPopover onInsertCitation={onInsertCitation} usedCitationIds={usedCitationIds} availableCitationIds={availableCitationIds} />
     </div>
   );
 };
 
 export interface LexicalJustificationEditorProps {
-  mode?: 'scroll-strip' | 'sidebar' | 'popover';
   label?: string;
   citations?: CitationData[];
   onChange?: (editorState: EditorState) => void;
 }
 
 export function LexicalJustificationEditor({
-  mode = 'scroll-strip',
   label = 'Begründung',
   citations = [],
   onChange,
 }: LexicalJustificationEditorProps) {
-  const [sidebarVisible, setSidebarVisible] = useState(true);
   const [editorInstance, setEditorInstance] = useState<LexicalEditor | null>(null);
   const [usedCitationIds, setUsedCitationIds] = useState<Set<number>>(new Set());
 
@@ -385,12 +248,8 @@ export function LexicalJustificationEditor({
   return (
     <CitationProvider citations={citations}>
       <div className="w-full">
-        {/* Header with label on left, citation tools on right - same line */}
         <LexicalCitationHeader
           label={label}
-          mode={mode}
-          sidebarVisible={sidebarVisible}
-          onToggleSidebar={() => setSidebarVisible(!sidebarVisible)}
           onInsertCitation={handleInsertCitation}
           usedCitationIds={usedCitationIds}
           availableCitationIds={availableCitationIds}
@@ -400,33 +259,19 @@ export function LexicalJustificationEditor({
         {/* Key forces remount when CitationNode module is hot-reloaded, fixing HMR node mismatch */}
         <LexicalComposer key={CITATION_NODE_VERSION} initialConfig={initialConfig}>
         <div className="bg-white rounded-[6px] border border-[#E1E1E1] p-3 relative overflow-hidden">
-          <div className="flex relative">
-            <RichTextPlugin
-              contentEditable={
-                <ContentEditable
-                  className={`text-[13px] leading-[20px] text-[#141414] focus:outline-none min-h-[80px] w-full transition-[padding] duration-300 ${
-                    mode === 'sidebar' && sidebarVisible ? 'pr-10' : ''
-                  }`}
-                />
-              }
-              placeholder={
-                <div className="text-[13px] text-gray-400 absolute top-0 left-0 pointer-events-none">
-                  Enter justification text...
-                </div>
-              }
-              ErrorBoundary={LexicalErrorBoundary}
-            />
-
-            {/* Sidebar sits inside the editor area to the right */}
-            {mode === 'sidebar' && (
-              <LexicalSidebar
-                visible={sidebarVisible}
-                onInsertCitation={handleInsertCitation}
-                usedCitationIds={usedCitationIds}
-                availableCitationIds={availableCitationIds}
+          <RichTextPlugin
+            contentEditable={
+              <ContentEditable
+                className="text-[13px] leading-[20px] text-[#141414] focus:outline-none min-h-[80px] w-full"
               />
-            )}
-          </div>
+            }
+            placeholder={
+              <div className="text-[13px] text-gray-400 absolute top-0 left-0 pointer-events-none">
+                Enter justification text...
+              </div>
+            }
+            ErrorBoundary={LexicalErrorBoundary}
+          />
         </div>
 
         {/* Plugins */}

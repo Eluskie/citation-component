@@ -7,8 +7,10 @@ import { Input } from './components/ui/input';
 import { AnimatedAddToReasoningButton } from './components/AnimatedAddToReasoningButton';
 
 // ============================================================================
-// MOCK COMPONENTS - These are placeholder UI elements for demonstration
-// These should be replaced with your actual application components
+// MOCK COMPONENTS — For demo context only. Not production code.
+// The developer receiving this codebase should replace these with real
+// application components. They exist so you can run the demo and see
+// citations in context (sidebar nav, PDF viewer, page header).
 // ============================================================================
 
 // Mock: Cortea Logo
@@ -677,7 +679,7 @@ const RealContentPanel = ({
   linkedDocs: ReferenceDoc[];
   setLinkedDocs: React.Dispatch<React.SetStateAction<ReferenceDoc[]>>;
 }) => {
-  const [citationMode] = useState<'scroll-strip' | 'sidebar' | 'popover'>('popover');
+  // Citation insertion uses the Popover variation (shipped)
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
   const [linkSearchQuery, setLinkSearchQuery] = useState("");
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
@@ -784,7 +786,6 @@ const RealContentPanel = ({
       {/* REAL COMPONENT: Begründung */}
       <div>
         <LexicalJustificationEditor
-          mode={citationMode}
           label="Begründung"
           citations={allCitations}
         />
@@ -925,16 +926,22 @@ export default function App() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-white font-sans text-[#141414]">
-      {/* MOCK: Top Header */}
+      {/* Dev banner — remove in production */}
+      <div className="bg-amber-100 border-b border-amber-300 px-4 py-1 text-[11px] text-amber-800 flex items-center gap-4 shrink-0">
+        <span className="font-semibold">DEV MODE</span>
+        <span>Gray areas = mock scaffolding (header, sidebar, PDF viewer). Center panel = real citation components.</span>
+      </div>
+
+      {/* MOCK: Top Header — replace with your app shell */}
       <MockTopHeader />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* MOCK: Left Sidebar */}
+        {/* MOCK: Left Sidebar — replace with your tree navigation */}
         <MockSidebar />
 
         {/* Main Content Area */}
         <div className="w-[35%] min-w-[400px] flex flex-col bg-white border-r border-gray-200 shrink-0">
-          {/* MOCK: Page Title */}
+          {/* MOCK: Page Title — replace with your page header */}
           <div className="px-6 py-5 border-b border-gray-100 shrink-0">
             <h1 className="text-[18px] font-[600] text-[#141414] mb-1">
               Verantwortung des Leitungsorgans für IKT-Risiken
@@ -948,7 +955,7 @@ export default function App() {
           <RealContentPanel linkedDocs={linkedDocs} setLinkedDocs={setLinkedDocs} />
         </div>
 
-        {/* MOCK: PDF Viewer */}
+        {/* MOCK: PDF Viewer — replace with your document viewer */}
         <MockPDFViewer
           isSelectionMode={isSelectionMode}
           onToggleSelectionMode={() => setIsSelectionMode(!isSelectionMode)}

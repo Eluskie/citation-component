@@ -73,7 +73,7 @@ function CitationChip({ citationId, nodeKey }: { citationId: number; nodeKey: st
       onDragEnd={handleDragEnd}
     >
       <span
-        className={`inline-flex items-center justify-center bg-[#EAEAEA] text-[#141414] rounded px-1.5 py-0.5 mx-0.5 text-[11px] font-[500] min-w-[20px] text-center select-none align-middle cursor-grab active:cursor-grabbing ${
+        className={`inline-flex items-center justify-center bg-[#EAEAEA] text-[#141414] rounded-[4px] px-1.5 py-0.5 mx-0.5 text-[11px] font-[500] min-w-[20px] text-center select-none align-middle cursor-grab active:cursor-grabbing ${
           isDragging ? 'opacity-50' : ''
         }`}
         contentEditable={false}
@@ -180,7 +180,7 @@ export class CitationNode extends DecoratorNode<JSX.Element> {
     const element = document.createElement('span');
     element.setAttribute('data-citation-id', String(this.__citationId));
     element.className =
-      'inline-flex items-center justify-center bg-[#EAEAEA] text-[#141414] rounded px-1.5 py-0.5 mx-0.5 text-[11px] font-[500] min-w-[20px] text-center select-none align-middle';
+      'inline-flex items-center justify-center bg-[#EAEAEA] text-[#141414] rounded-[4px] px-1.5 py-0.5 mx-0.5 text-[11px] font-[500] min-w-[20px] text-center select-none align-middle';
     element.textContent = String(this.__citationId);
     return { element };
   }
