@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { LexicalJustificationEditor, CitationData } from './components/lexical';
-import { ChevronDown, ChevronRight, Plus, X, FileText, Check, Link2, Search, Filter, Highlighter, ArrowUp } from 'lucide-react';
+import { ChevronDown, ChevronRight, Plus, X, FileText, Check, Search, Filter, Highlighter } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from './components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from './components/ui/tooltip';
 import { Input } from './components/ui/input';
+import { AnimatedAddToReasoningButton } from './components/AnimatedAddToReasoningButton';
 
 // ============================================================================
 // MOCK COMPONENTS - These are placeholder UI elements for demonstration
@@ -365,7 +366,23 @@ const MockPDFViewer = ({
 };
 
 // ============================================================================
-// REAL COMPONENTS - These are the actual components to be handed over
+// REAL COMPONENTS - Production-ready citation reference components
+// ============================================================================
+//
+// Usage:
+// 1. ReferenceGroup - Container for a document with multiple citations
+//    - Collapsible header with document name
+//    - Remove reference functionality
+//    - Maps through citations array
+//
+// 2. CitationRow - Individual citation display
+//    - Shows page number, citation text, and badge
+//    - Edit mode for new citations
+//    - Hover actions: add to reasoning, delete
+//    - Full-width hover background
+//
+// Styling: Exact Figma specs with rgba colors, precise spacing
+// Structure: Scalable for multiple reference documents
 // ============================================================================
 
 // Real: Citation data types
@@ -375,6 +392,7 @@ interface Citation {
   fullText?: string;
   id: number;
   isNew?: boolean;
+  justCreated?: boolean; // Shows full "Add to reasoning" button when true
 }
 
 interface ReferenceDoc {
@@ -382,25 +400,32 @@ interface ReferenceDoc {
   citations: Citation[];
 }
 
-// Real: Citation Row with tooltip
+// Citation Row - displays individual citation with edit/delete functionality
+// States: default, hover, creating (isNew), created (justCreated)
 const CitationRow = ({
   citation,
   fileName,
   onUpdateTitle,
   onDelete,
-  onAddToReasoning
+  onAddToReasoning,
+  confirmingDelete = false,
+  onCancelDelete
 }: {
   citation: Citation;
   fileName: string;
   onUpdateTitle?: (id: number, title: string) => void;
   onDelete?: (id: number) => void;
   onAddToReasoning?: (citation: Citation) => void;
+  confirmingDelete?: boolean;
+  onCancelDelete?: () => void;
 }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipY, setTooltipY] = useState(0);
   const [editValue, setEditValue] = useState(citation.isNew ? '' : citation.text);
-  const rowRef = React.useRef<HTMLDivElement>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Determine state
+  const isCreating = citation.isNew;
+  const isCreated = citation.justCreated;
+  const showGrayBackground = isCreating || isCreated;
 
   // Auto-focus input when new citation is created
   React.useEffect(() => {
@@ -408,15 +433,6 @@ const CitationRow = ({
       inputRef.current.focus();
     }
   }, [citation.isNew]);
-
-  const handleMouseEnter = () => {
-    if (citation.isNew) return; // Don't show tooltip while editing
-    if (rowRef.current) {
-      const rect = rowRef.current.getBoundingClientRect();
-      setTooltipY(rect.top + rect.height / 2);
-    }
-    setShowTooltip(true);
-  };
 
   const handleFinishEditing = () => {
     if (editValue.trim() && onUpdateTitle) {
@@ -440,161 +456,195 @@ const CitationRow = ({
 
   return (
     <div
-      ref={rowRef}
-      className="group relative px-3 py-2.5 flex items-center gap-3 hover:bg-gray-50 border-b border-gray-50 last:border-b-0 cursor-default"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={() => setShowTooltip(false)}
+      className={`group border-t border-[rgba(0,0,0,0.14)] -mx-px last:-mb-px transition-colors ${
+        showGrayBackground ? 'bg-[#f9f9f9]' : 'hover:bg-[#f9f9f9]'
+      }`}
+      onMouseLeave={() => confirmingDelete && onCancelDelete?.()}
     >
-      {/* Tooltip disabled - edition text not available from backend */}
-      {false && showTooltip && !citation.isNew && (
-        <div
-          className="fixed z-[100] pointer-events-none"
-          style={{
-            width: '320px',
-            right: '640px',
-            top: tooltipY,
-            transform: 'translateY(-50%)',
-          }}
-        >
-          <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4">
-            <p className="text-[13px] leading-[1.7] text-[#141414]">
-              {citation.fullText || citation.text}
-            </p>
-            <div className="border-t border-gray-100 my-3" />
-            <div className="flex items-center justify-between text-[10px] text-[#8A8A8A]">
-              <span className="truncate pr-4">{fileName}</span>
-              <span className="shrink-0">Page {citation.page}</span>
-            </div>
-          </div>
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1.5 w-3 h-3 bg-white border-r border-t border-gray-200 rotate-45" />
-        </div>
-      )}
+      <div className={`flex gap-[6px] pb-[6px] pt-[7px] px-[8px] h-[40px] items-center`}>
+        {/* Page number */}
+        <span className="text-[13px] leading-[19px] font-[425] text-[#525252] whitespace-nowrap shrink-0">
+          S. {citation.page}
+        </span>
 
-      {citation.isNew ? (
-        <input
-          ref={inputRef}
-          type="text"
-          value={editValue}
-          onChange={(e) => setEditValue(e.target.value)}
-          onBlur={handleFinishEditing}
-          onKeyDown={handleKeyDown}
-          placeholder="Enter citation title..."
-          className="flex-1 text-[13px] leading-snug text-[#141414] bg-transparent border-b border-gray-300 focus:border-gray-500 outline-none py-0.5"
-        />
-      ) : (
-        <div className="text-[13px] leading-snug text-[#141414] flex-1">
-          {citation.text}
-        </div>
-      )}
+        {/* Text or input field */}
+        {isCreating ? (
+          <input
+            ref={inputRef}
+            type="text"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            onBlur={handleFinishEditing}
+            onKeyDown={handleKeyDown}
+            placeholder="Enter citation title..."
+            className="flex-1 text-[13px] leading-[19px] font-[475] text-[#141414] placeholder:text-[rgba(0,0,0,0.2)] bg-transparent outline-none"
+          />
+        ) : (
+          <span className="flex-1 text-[13px] leading-[19px] font-[475] text-[#141414]">
+            {citation.text}
+          </span>
+        )}
 
-      {/* Add to reasoning button - appears on hover, only for saved citations */}
-      {!citation.isNew && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
+        {/* Buttons - different for each state */}
+        {isCreated && (
+          <>
+            {/* Animated "Add to reasoning" button - animates on click */}
+            <AnimatedAddToReasoningButton
               onClick={() => onAddToReasoning?.(citation)}
-              className="p-0.5 rounded hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-            >
-              <ArrowUp size={14} className="text-gray-400 hover:text-[#141414] transition-colors" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
-            Add to reasoning
-          </TooltipContent>
-        </Tooltip>
-      )}
+            />
+          </>
+        )}
 
-      {/* Delete/Cancel button - appears on hover, right side before page number */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            onClick={handleCancel}
-            className="p-0.5 rounded hover:bg-gray-100 transition-colors opacity-0 group-hover:opacity-100 shrink-0"
-          >
-            <X size={14} className="text-gray-400 hover:text-red-500 transition-colors" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
-          {citation.isNew ? 'Cancel' : 'Remove citation'}
-        </TooltipContent>
-      </Tooltip>
+        {/* Add citation icon button - shows on hover for saved citations (not creating/created states) */}
+        {!isCreating && !isCreated && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => onAddToReasoning?.(citation)}
+                className="px-[5px] py-[2px] rounded-[5px] hover:bg-[rgba(0,0,0,0.08)] transition-colors opacity-0 group-hover:opacity-100 shrink-0"
+              >
+                <img src="/icon_citation.svg" alt="Add citation" className="w-[13px] h-[13px]" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
+              Insert citation
+            </TooltipContent>
+          </Tooltip>
+        )}
 
-      <span className="text-[#8A8A8A] text-[13px] shrink-0">S. {citation.page}</span>
-      <div className={`shrink-0 px-1.5 py-0.5 rounded text-[11px] font-[500] min-w-[18px] text-center ${citation.isNew ? 'bg-[#BFF981] text-[#141414]' : 'bg-[#EAEAEA] text-[#141414]'}`}>
-        {citation.id}
+        {/* X button - shows on hover (default state) or always (creating/created states) */}
+        {!isCreated && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleCancel}
+                className={`px-[5px] py-[2px] rounded-[5px] transition-colors shrink-0 ${
+                  confirmingDelete
+                    ? 'bg-red-100 opacity-100'
+                    : isCreating
+                      ? 'opacity-100 hover:bg-[rgba(0,0,0,0.08)]'
+                      : 'opacity-0 group-hover:opacity-100 hover:bg-[rgba(0,0,0,0.08)]'
+                }`}
+              >
+                <X size={13} className={`transition-colors ${confirmingDelete ? 'text-red-600' : 'text-[#8a8a8a]'}`} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
+              {confirmingDelete ? 'Click again to confirm' : (citation.isNew ? 'Cancel' : 'Remove citation')}
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* X button - always visible in created state */}
+        {isCreated && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleCancel}
+                className={`px-[5px] py-[2px] rounded-[5px] transition-colors shrink-0 ${
+                  confirmingDelete ? 'bg-red-100' : 'hover:bg-[rgba(0,0,0,0.08)]'
+                }`}
+              >
+                <X size={13} className={`transition-colors ${confirmingDelete ? 'text-red-600' : 'text-[#8a8a8a]'}`} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
+              {confirmingDelete ? 'Click again to confirm' : 'Remove citation'}
+            </TooltipContent>
+          </Tooltip>
+        )}
+
+        {/* Citation badge - green for creating/created, gray for default/hover */}
+        <div className={`flex items-center justify-center px-1 rounded-[4px] shrink-0 ${
+          isCreating || isCreated ? 'bg-[#c8ff8d]' : 'bg-[rgba(0,0,0,0.06)]'
+        }`}>
+          <span className="text-[13px] leading-[19px] font-[425] text-[#141414]">
+            {citation.id}
+          </span>
+        </div>
       </div>
     </div>
   );
 };
 
-// Real: Reference Group (Document accordion)
+// Real: Reference Group (Figma exact + full functionality)
 const ReferenceGroup = ({
   doc,
-  isCollapsed = false,
-  onUnlink,
+  onRemove,
   onUpdateCitationTitle,
   onDeleteCitation,
-  onAddCitationToReasoning
+  onAddCitationToReasoning,
+  confirmingDeleteId,
+  setConfirmingDeleteId
 }: {
   doc: ReferenceDoc;
-  isCollapsed?: boolean;
-  onUnlink?: (docFileName: string) => void;
+  onRemove?: (docFileName: string) => void;
   onUpdateCitationTitle?: (citationId: number, title: string) => void;
   onDeleteCitation?: (citationId: number) => void;
   onAddCitationToReasoning?: (citation: Citation, fileName: string) => void;
+  confirmingDeleteId: number | null;
+  setConfirmingDeleteId: (id: number | null) => void;
 }) => {
-  const [collapsed, setCollapsed] = useState(isCollapsed);
-  const [showUnlinkConfirm, setShowUnlinkConfirm] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   return (
-    <div className="border border-gray-200 rounded-md overflow-hidden bg-white">
+    <div className="bg-white border border-[rgba(0,0,0,0.14)] rounded-[5px] overflow-clip p-px">
+      {/* Header - clickable to toggle collapse (disabled during remove) */}
       <div
-        className="bg-white px-3 py-2.5 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors"
-        onClick={() => setCollapsed(!collapsed)}
+        className={`flex gap-[6px] items-center pl-[12px] pr-[8px] pt-[7px] pb-[6px] h-[40px] transition-colors -mx-px -mt-px ${
+          showRemoveConfirm ? 'cursor-default' : 'cursor-pointer hover:bg-[rgba(0,0,0,0.03)]'
+        }`}
+        onClick={() => !showRemoveConfirm && setCollapsed(!collapsed)}
       >
-        <div className="flex items-center gap-2 overflow-hidden">
-          <FileText className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-          <span className="text-[13px] font-[500] text-[#141414] truncate">{doc.fileName}</span>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {doc.citations.map((cite) => (
-            <span
-              key={cite.id}
-              className={`rounded px-1.5 py-0.5 text-[11px] font-[500] min-w-[18px] text-center ${cite.isNew ? 'bg-[#BFF981] text-[#141414]' : 'bg-[#EAEAEA] text-[#141414]'}`}
+        <FileText className="w-[13px] h-[19px] text-[#8a8a8a] shrink-0" />
+        <span className="flex-1 text-[13px] leading-[19px] font-[475] text-[#141414] truncate">
+          {doc.fileName}
+        </span>
+
+        {/* Show citation badges when collapsed OR removing */}
+        {(collapsed || showRemoveConfirm) && doc.citations.map(cite => (
+          <div key={cite.id} className="bg-[rgba(0,0,0,0.06)] relative rounded-[4px] shrink-0">
+            <div className="flex items-center justify-center px-[4px]">
+              <span className="text-[13px] leading-[19px] font-[425] text-[#141414] text-center">
+                {cite.id}
+              </span>
+            </div>
+          </div>
+        ))}
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowRemoveConfirm(!showRemoveConfirm); }}
+              className="flex items-center px-[5px] py-[2px] rounded-[5px] hover:bg-[rgba(0,0,0,0.08)] transition-colors"
             >
-              {cite.id}
-            </span>
-          ))}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowUnlinkConfirm(true); }}
-                className="p-1 rounded hover:bg-gray-100 transition-colors ml-1 group"
-              >
-                <X size={14} className="text-gray-400 group-hover:text-red-500 transition-colors" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
-              Click to unlink
-            </TooltipContent>
-          </Tooltip>
-          <ChevronDown size={14} className={`text-gray-400 transition-transform duration-200 ${collapsed ? 'rotate-180' : ''}`} />
+              <X size={13} className="text-[#8a8a8a]" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="bg-[#141414] text-white text-xs px-2 py-1">
+            Remove reference
+          </TooltipContent>
+        </Tooltip>
+        <div className="flex items-center px-[5px] py-[2px]">
+          <ChevronDown size={13} className={`text-[#8a8a8a] transition-transform ${collapsed || showRemoveConfirm ? 'rotate-180' : ''}`} />
         </div>
       </div>
 
-      {showUnlinkConfirm && (
-        <div className="border-t border-gray-100 px-3 py-2 flex items-center justify-between bg-[#FAFAFA]">
-          <span className="text-[13px] text-[#525252]">Unlink this document?</span>
-          <div className="flex items-center gap-2">
+      {/* Remove Confirm */}
+      {showRemoveConfirm && (
+        <div className="border-t border-[rgba(0,0,0,0.14)] px-[8px] py-[4px] flex items-center justify-between bg-[#f9f9f9] -mx-px -mb-px">
+          <span className="text-[13px] leading-[19px] font-[425] text-[#525252]">Remove this reference?</span>
+          <div className="flex items-center gap-[6px]">
             <button
-              onClick={() => { onUnlink?.(doc.fileName); setShowUnlinkConfirm(false); }}
-              className="px-2.5 py-1 text-[13px] font-[500] text-[#141414] hover:bg-gray-200 rounded transition-colors"
+              onClick={() => { onRemove?.(doc.fileName); setShowRemoveConfirm(false); }}
+              className="px-2.5 py-1 text-[13px] leading-[19px] font-[475] text-[#141414] hover:bg-[rgba(0,0,0,0.08)] rounded-[4px] transition-colors"
             >
-              Unlink
+              Remove
             </button>
             <button
-              onClick={(e) => { e.stopPropagation(); setShowUnlinkConfirm(false); }}
-              className="px-2.5 py-1 text-[13px] text-[#8A8A8A] hover:text-[#141414] hover:bg-gray-200 rounded transition-colors"
+              onClick={() => setShowRemoveConfirm(false)}
+              className="px-2.5 py-1 text-[13px] leading-[19px] font-[425] text-[#8A8A8A] hover:text-[#141414] hover:bg-[rgba(0,0,0,0.08)] rounded-[4px] transition-colors"
             >
               Cancel
             </button>
@@ -602,20 +652,19 @@ const ReferenceGroup = ({
         </div>
       )}
 
-      {!collapsed && !showUnlinkConfirm && (
-        <div className="border-t border-gray-100">
-          {doc.citations.map((cite) => (
-            <CitationRow
-              key={cite.id}
-              citation={cite}
-              fileName={doc.fileName}
-              onUpdateTitle={onUpdateCitationTitle}
-              onDelete={onDeleteCitation}
-              onAddToReasoning={(c) => onAddCitationToReasoning?.(c, doc.fileName)}
-            />
-          ))}
-        </div>
-      )}
+      {/* Citation Rows */}
+      {!collapsed && !showRemoveConfirm && doc.citations.map((cite) => (
+        <CitationRow
+          key={cite.id}
+          citation={cite}
+          fileName={doc.fileName}
+          onUpdateTitle={onUpdateCitationTitle}
+          onDelete={onDeleteCitation}
+          onAddToReasoning={(c) => onAddCitationToReasoning?.(c, doc.fileName)}
+          confirmingDelete={confirmingDeleteId === cite.id}
+          onCancelDelete={() => setConfirmingDeleteId(null)}
+        />
+      ))}
     </div>
   );
 };
@@ -631,6 +680,7 @@ const RealContentPanel = ({
   const [citationMode] = useState<'scroll-strip' | 'sidebar' | 'popover'>('popover');
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false);
   const [linkSearchQuery, setLinkSearchQuery] = useState("");
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(null);
 
   const allCitations: CitationData[] = linkedDocs.flatMap((doc) =>
     doc.citations.map((cite) => ({
@@ -649,22 +699,46 @@ const RealContentPanel = ({
 
   // Handle citation title update (when user finishes editing a new citation)
   const handleUpdateCitationTitle = (citationId: number, title: string) => {
+    console.log(`💾 Saving citation ${citationId} with title: "${title}" - setting justCreated=true`);
+
+    // Clear justCreated flag from any other citations first
+    setLinkedDocs(prev => prev.map(doc => ({
+      ...doc,
+      citations: doc.citations.map(cite => ({
+        ...cite,
+        justCreated: false // Clear any existing justCreated flags
+      }))
+    })));
+
+    // Then set the new citation's justCreated flag
     setLinkedDocs(prev => prev.map(doc => ({
       ...doc,
       citations: doc.citations.map(cite =>
         cite.id === citationId
-          ? { ...cite, text: title, isNew: false }
+          ? { ...cite, text: title, isNew: false, justCreated: true }
           : cite
       )
     })));
+
+    // NOTE: justCreated flag is now only cleared when:
+    // 1. User clicks "Add to reasoning" (animation completes)
+    // 2. User creates another citation (above code clears old ones)
   };
 
-  // Handle citation deletion (cancel new citation)
+  // Handle citation deletion with two-click confirmation
   const handleDeleteCitation = (citationId: number) => {
+    // First click: Mark for confirmation
+    if (confirmingDeleteId !== citationId) {
+      setConfirmingDeleteId(citationId);
+      return;
+    }
+
+    // Second click: Actually delete
     setLinkedDocs(prev => prev.map(doc => ({
       ...doc,
       citations: doc.citations.filter(cite => cite.id !== citationId)
     })));
+    setConfirmingDeleteId(null);
   };
 
   // Handle adding citation to reasoning
@@ -674,6 +748,16 @@ const RealContentPanel = ({
       detail: { citationId: citation.id, fileName }
     });
     window.dispatchEvent(event);
+
+    // Clear justCreated flag after adding to reasoning
+    setLinkedDocs(prev => prev.map(doc => ({
+      ...doc,
+      citations: doc.citations.map(cite =>
+        cite.id === citation.id
+          ? { ...cite, justCreated: false }
+          : cite
+      )
+    })));
   };
 
   return (
@@ -709,22 +793,22 @@ const RealContentPanel = ({
       {/* REAL COMPONENT: Referenzen */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <div className="text-[13px] font-[500] text-[#141414]">Referenzen</div>
+          <div className="text-[16px] leading-[22px] font-[550] text-[#141414]">Referenzen</div>
 
           <Popover open={linkPopoverOpen} onOpenChange={setLinkPopoverOpen}>
             <PopoverTrigger asChild>
-              <button className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-gray-100 rounded-[5px] text-[13px] font-[500] text-[#141414] transition-colors">
-                <Link2 size={14} className="text-[#8A8A8A]" />
-                Link document
+              <button className="flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-[rgba(0,0,0,0.06)] rounded-[5px] text-[13px] leading-[19px] font-[475] text-[#141414] transition-colors">
+                <Plus size={14} className="text-[#8A8A8A]" />
+                Add document
               </button>
             </PopoverTrigger>
-            <PopoverContent className="w-[280px] p-0 bg-white border border-gray-200 rounded-[6px] shadow-lg" align="end">
-              <div className="p-3 border-b border-gray-100">
+            <PopoverContent className="w-[280px] p-0 bg-white border border-[rgba(0,0,0,0.14)] rounded-[6px] shadow-lg" align="end">
+              <div className="p-3 border-b border-[rgba(0,0,0,0.09)]">
                 <Input
                   placeholder="Search documents..."
                   value={linkSearchQuery}
                   onChange={(e) => setLinkSearchQuery(e.target.value)}
-                  className="h-8 text-[13px] bg-[#F9F9F9] border-gray-200"
+                  className="h-8 text-[13px] leading-[19px] bg-[#F9F9F9] border-[rgba(0,0,0,0.09)]"
                 />
               </div>
               <div className="max-h-[200px] overflow-y-auto">
@@ -735,10 +819,10 @@ const RealContentPanel = ({
                       setLinkedDocs(prev => [...prev, doc]);
                       setLinkPopoverOpen(false);
                     }}
-                    className="w-full text-left px-3 py-2.5 hover:bg-gray-50 flex items-center gap-2"
+                    className="w-full text-left px-3 py-2.5 hover:bg-[rgba(0,0,0,0.03)] flex items-center gap-2"
                   >
-                    <FileText className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                    <span className="text-[13px] text-[#141414] truncate">{doc.fileName}</span>
+                    <FileText className="w-3.5 h-3.5 text-[#8a8a8a] shrink-0" />
+                    <span className="text-[13px] leading-[19px] text-[#141414] truncate">{doc.fileName}</span>
                   </button>
                 ))}
               </div>
@@ -746,16 +830,17 @@ const RealContentPanel = ({
           </Popover>
         </div>
 
-        <div className="space-y-3">
+        <div className="flex flex-col gap-3">
           {linkedDocs.map((doc) => (
             <ReferenceGroup
               key={doc.fileName}
               doc={doc}
-              isCollapsed={false}
-              onUnlink={(fileName) => setLinkedDocs(prev => prev.filter(d => d.fileName !== fileName))}
+              onRemove={(fileName) => setLinkedDocs(prev => prev.filter(d => d.fileName !== fileName))}
               onUpdateCitationTitle={handleUpdateCitationTitle}
               onDeleteCitation={handleDeleteCitation}
               onAddCitationToReasoning={handleAddCitationToReasoning}
+              confirmingDeleteId={confirmingDeleteId}
+              setConfirmingDeleteId={setConfirmingDeleteId}
             />
           ))}
         </div>
@@ -763,8 +848,8 @@ const RealContentPanel = ({
 
       {/* Mock: Kommentare */}
       <div>
-        <div className="text-[13px] font-[500] text-[#141414] mb-2">Kommentare</div>
-        <div className="border border-gray-200 rounded-[6px] h-10 bg-white"></div>
+        <div className="text-[16px] leading-[22px] font-[550] text-[#141414] mb-2">Kommentare</div>
+        <div className="border border-[rgba(0,0,0,0.14)] rounded-[6px] h-10 bg-white"></div>
       </div>
     </div>
   );
